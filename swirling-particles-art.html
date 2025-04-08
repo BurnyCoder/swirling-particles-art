@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customizable Flowing Particles Art with Advanced Physics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Basic styling for body and canvas */
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #000; /* Black background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif; /* Use Inter font */
+        }
+        canvas {
+            display: block; /* Remove extra space below canvas */
+            background-color: #000; /* Canvas background */
+            cursor: crosshair; /* Indicate interaction area */
+        }
+        /* Style for the message box */
+        #messageBox {
+            position: fixed;
+            bottom: 20px; /* Moved to bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(50, 50, 50, 0.8); /* Darker background */
+            color: #eee;
+            padding: 8px 15px;
+            border-radius: 6px; /* Slightly smaller radius */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none; /* Allow clicks through */
+        }
+        #messageBox.visible {
+            opacity: 1;
+        }
+        /* Style for the controls panel */
+        #controlsPanel {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background-color: rgba(40, 40, 40, 0.9); /* Slightly less transparent */
+            color: #e0e0e0;
+            padding: 15px 20px; /* More padding */
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            font-size: 14px;
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            width: 300px; /* Wider panel */
+            max-height: calc(100vh - 40px); /* Limit height with padding */
+            overflow-y: auto; /* Add scroll if needed */
+        }
+         #controlsPanel.hidden {
+            transform: translateX(-110%); /* Slide out */
+            opacity: 0;
+            pointer-events: none;
+        }
+        /* Styling for controls */
+        #controlsPanel label,
+        #controlsPanel .label-like { /* Class for non-label elements acting as labels */
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #ccc; /* Lighter label color */
+            font-size: 0.9em; /* Smaller labels */
+        }
+        #controlsPanel input[type="range"],
+        #controlsPanel input[type="number"],
+        #controlsPanel select {
+            width: 100%;
+            margin-bottom: 15px; /* More spacing */
+            accent-color: #0ea5e9; /* Tailwind sky-500 */
+            cursor: pointer;
+            background-color: #444;
+            border: 1px solid #666;
+            color: #eee;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+         #controlsPanel input[type="range"] {
+             padding: 0; /* Range needs no padding */
+             background-color: transparent; /* Range needs no background */
+             border: none;
+             height: 5px; /* Make range slider track thinner */
+         }
+         #controlsPanel input[type="number"] {
+             width: 75px; /* Slightly wider for floats */
+             text-align: right;
+             margin-left: 5px;
+         }
+         #controlsPanel select {
+             margin-bottom: 15px;
+             padding: 6px 8px; /* Select needs more padding */
+         }
+        #controlsPanel .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px; /* Less margin before slider */
+        }
+         #controlsPanel .control-group label {
+             margin-bottom: 0; /* Remove bottom margin in flex group */
+             flex-shrink: 0; /* Prevent label shrinking */
+             margin-right: 10px;
+         }
+         #controlsPanel .checkbox-group {
+             display: flex;
+             align-items: center;
+             margin-bottom: 15px;
+         }
+         #controlsPanel .checkbox-group input[type="checkbox"] {
+             width: auto; /* Checkbox size is intrinsic */
+             margin-right: 8px;
+             margin-bottom: 0; /* No bottom margin for checkbox itself */
+             accent-color: #0ea5e9;
+         }
+         #controlsPanel .checkbox-group label {
+             margin-bottom: 0;
+             font-weight: normal; /* Normal weight for checkbox label */
+             color: #e0e0e0;
+             font-size: 0.95em;
+         }
+        /* Style for buttons */
+        button.control-button {
+            background-color: #0ea5e9; /* sky-500 */
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+            margin-right: 5px; /* Spacing between buttons */
+        }
+        button.control-button:hover {
+            background-color: #0284c7; /* sky-600 */
+        }
+        /* Toggle button styling */
+         #toggleControlsButton {
+             position: fixed;
+             top: 15px;
+             left: 15px;
+             z-index: 1002; /* Above the panel when hidden */
+             background-color: rgba(40, 40, 40, 0.85);
+             color: #e0e0e0;
+             border: none;
+             padding: 8px;
+             border-radius: 50%; /* Make it round */
+             cursor: pointer;
+             transition: background-color 0.2s ease, transform 0.3s ease-out;
+             width: 36px; /* Fixed size */
+             height: 36px;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+         }
+         #toggleControlsButton:hover {
+             background-color: rgba(60, 60, 60, 0.9);
+         }
+         hr.control-divider {
+             border: none;
+             border-top: 1px solid #555; /* Divider line */
+             margin: 20px 0 15px 0; /* More vertical margin */
+         }
+         h4.control-heading {
+             color: #0ea5e9; /* Accent color for headings */
+             font-weight: 600;
+             margin-bottom: 10px;
+             margin-top: 5px;
+             font-size: 1em;
+         }
+    </style>
+</head>
+<body>
+    <canvas id="mathArtCanvas"></canvas>
+
+    <div id="messageBox">Click or Drag to Interact!</div>
+
+    <button id="toggleControlsButton" title="Toggle Controls">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+    </button>
+
+    <div id="controlsPanel" class="hidden">
+        <h3 class="text-lg font-semibold mb-4 text-white">Controls</h3>
+
+        <h4 class="control-heading">General</h4>
+        <div class="control-group">
+             <label for="particleCount">Max Particles:</label>
+             <input type="number" id="particleCountValue" min="100" max="5000" step="100">
+        </div>
+        <input type="range" id="particleCount" min="100" max="5000" step="100" title="Max Particles">
+
+        <div class="control-group">
+             <label for="maxSpeed">Base Speed:</label>
+             <input type="number" id="maxSpeedValue" min="0.5" max="15" step="0.5">
+        </div>
+        <input type="range" id="maxSpeed" min="0.5" max="15" step="0.5" title="Base Particle Speed">
+
+        <div class="control-group">
+             <label for="trailLength">Trail Fade:</label>
+              <input type="number" id="trailLengthValue" min="0.01" max="0.5" step="0.01">
+        </div>
+        <input type="range" id="trailLength" min="0.01" max="0.5" step="0.01" title="Background Fade Alpha (Lower = Longer Trails)">
+
+
+        <div class="control-group">
+             <label for="colorSpeed">Color Speed:</label>
+             <input type="number" id="colorSpeedValue" min="0.0" max="10" step="0.1">
+        </div>
+        <input type="range" id="colorSpeed" min="0.0" max="10" step="0.1" title="Hue Change Speed">
+
+        <hr class="control-divider">
+        <h4 class="control-heading">Particle Appearance</h4>
+
+        <div class="control-group">
+             <label for="particleSizeMin">Min Size:</label>
+             <input type="number" id="particleSizeMinValue" min="0.1" max="10" step="0.1">
+        </div>
+        <input type="range" id="particleSizeMin" min="0.1" max="10" step="0.1" title="Minimum Particle Size">
+
+        <div class="control-group">
+             <label for="particleSizeMax">Max Size:</label>
+             <input type="number" id="particleSizeMaxValue" min="0.5" max="20" step="0.5">
+        </div>
+        <input type="range" id="particleSizeMax" min="0.5" max="20" step="0.5" title="Maximum Particle Size">
+
+         <div class="control-group">
+             <label for="lifespanBase">Min Lifespan:</label>
+             <input type="number" id="lifespanBaseValue" min="10" max="500" step="10">
+        </div>
+        <input type="range" id="lifespanBase" min="10" max="500" step="10" title="Minimum Particle Lifespan (arbitrary units)">
+
+        <div class="control-group">
+             <label for="lifespanVariance">Add. Lifespan:</label>
+             <input type="number" id="lifespanVarianceValue" min="0" max="1000" step="10">
+        </div>
+        <input type="range" id="lifespanVariance" min="0" max="1000" step="10" title="Additional Random Lifespan Range">
+
+
+        <hr class="control-divider">
+        <h4 class="control-heading">Physics & Interaction</h4>
+
+        <div class="control-group">
+             <label for="gravityX">Gravity X:</label>
+             <input type="number" id="gravityXValue" min="-0.5" max="0.5" step="0.01">
+        </div>
+        <input type="range" id="gravityX" min="-0.5" max="0.5" step="0.01" title="Horizontal Gravity (Positive = Right)">
+
+
+        <div class="control-group">
+             <label for="gravityY">Gravity Y:</label>
+             <input type="number" id="gravityYValue" min="-0.5" max="0.5" step="0.01">
+        </div>
+        <input type="range" id="gravityY" min="-0.5" max="0.5" step="0.01" title="Vertical Gravity (Positive = Down)">
+
+        <div class="control-group">
+             <label for="friction">Friction:</label>
+             <input type="number" id="frictionValue" min="0" max="0.1" step="0.005">
+        </div>
+        <input type="range" id="friction" min="0" max="0.1" step="0.005" title="Air Resistance / Damping (0 = None)">
+
+        <div class="control-group">
+             <label for="swirlStrength">Swirl:</label>
+             <input type="number" id="swirlStrengthValue" min="0" max="0.5" step="0.01">
+        </div>
+        <input type="range" id="swirlStrength" min="0" max="0.5" step="0.01" title="Strength of Swirling Motion">
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="mouseForceActive">
+            <label for="mouseForceActive">Mouse Attract/Repel</label>
+        </div>
+        <div class="control-group">
+             <label for="mouseForceStrength">Mouse Force:</label>
+             <input type="number" id="mouseForceStrengthValue" min="-2" max="2" step="0.1">
+        </div>
+        <input type="range" id="mouseForceStrength" min="-2" max="2" step="0.1" title="Mouse Interaction Strength (+Attract, -Repel)">
+
+        <label for="boundaryMode" class="label-like">Boundary Mode:</label>
+        <select id="boundaryMode">
+            <option value="disappear">Disappear Offscreen</option>
+            <option value="wrap">Wrap Around</option>
+            <option value="bounce">Bounce Off Edges</option>
+        </select>
+
+        <hr class="control-divider">
+
+        <div>
+            <button id="resetButton" class="control-button">Reset Defaults</button>
+            <button id="clearButton" class="control-button">Clear Particles</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const canvas = document.getElementById('mathArtCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+        const controlsPanel = document.getElementById('controlsPanel');
+        const toggleControlsButton = document.getElementById('toggleControlsButton');
+        // General Controls
+        const particleCountSlider = document.getElementById('particleCount');
+        const particleCountValue = document.getElementById('particleCountValue');
+        const maxSpeedSlider = document.getElementById('maxSpeed');
+        const maxSpeedValue = document.getElementById('maxSpeedValue');
+        const trailLengthSlider = document.getElementById('trailLength');
+        const trailLengthValue = document.getElementById('trailLengthValue');
+        const colorSpeedSlider = document.getElementById('colorSpeed');
+        const colorSpeedValue = document.getElementById('colorSpeedValue');
+        // Appearance Controls
+        const particleSizeMinSlider = document.getElementById('particleSizeMin');
+        const particleSizeMinValue = document.getElementById('particleSizeMinValue');
+        const particleSizeMaxSlider = document.getElementById('particleSizeMax');
+        const particleSizeMaxValue = document.getElementById('particleSizeMaxValue');
+        const lifespanBaseSlider = document.getElementById('lifespanBase');
+        const lifespanBaseValue = document.getElementById('lifespanBaseValue');
+        const lifespanVarianceSlider = document.getElementById('lifespanVariance');
+        const lifespanVarianceValue = document.getElementById('lifespanVarianceValue');
+        // Physics Controls
+        const gravityXSlider = document.getElementById('gravityX');
+        const gravityXValue = document.getElementById('gravityXValue');
+        const gravityYSlider = document.getElementById('gravityY');
+        const gravityYValue = document.getElementById('gravityYValue');
+        const frictionSlider = document.getElementById('friction');
+        const frictionValue = document.getElementById('frictionValue');
+        const swirlStrengthSlider = document.getElementById('swirlStrength');
+        const swirlStrengthValue = document.getElementById('swirlStrengthValue');
+        const mouseForceActiveCheckbox = document.getElementById('mouseForceActive');
+        const mouseForceStrengthSlider = document.getElementById('mouseForceStrength');
+        const mouseForceStrengthValue = document.getElementById('mouseForceStrengthValue');
+        const boundaryModeSelect = document.getElementById('boundaryMode');
+        // Buttons
+        const resetButton = document.getElementById('resetButton');
+        const clearButton = document.getElementById('clearButton');
+
+
+        // --- Settings & State ---
+        let particles = [];
+        let hue = 0;
+        let particleSourceX = window.innerWidth / 2;
+        let particleSourceY = window.innerHeight / 2;
+        let mouseX = particleSourceX; // Track mouse position continuously
+        let mouseY = particleSourceY;
+        let isMouseDown = false;
+        let lastTime = 0;
+
+        // --- Default Settings ---
+        const defaultSettings = {
+            maxParticles: 1500,
+            baseSpeed: 10,
+            backgroundAlpha: 0.1,
+            hueIncrement: 10,
+            particleSizeMin: 1,      // New Control
+            particleSizeMax: 5,      // New Control
+            lifespanBase: 250,       // New Control
+            lifespanVariance: 500,   // New Control
+            trailHistory: 5,
+            swirlFactor: 0.2,
+            gravityX: 0,             // New Control
+            gravityY: 0,
+            friction: 0.005,
+            mouseForceActive: false, // New Control
+            mouseForceStrength: 0.5, // New Control
+            boundaryMode: 'bounce',// New Control ('disappear', 'wrap', 'bounce')
+            generationRate: 5,
+            burstOnClick: 30
+        };
+
+        // --- Current Settings (initialized with defaults) ---
+        let settings = { ...defaultSettings };
+
+        // Function to update UI elements from settings
+        function updateUIFromSettings() {
+            particleCountSlider.value = settings.maxParticles;
+            particleCountValue.value = settings.maxParticles;
+            maxSpeedSlider.value = settings.baseSpeed;
+            maxSpeedValue.value = settings.baseSpeed;
+            trailLengthSlider.value = settings.backgroundAlpha;
+            trailLengthValue.value = settings.backgroundAlpha;
+            colorSpeedSlider.value = settings.hueIncrement;
+            colorSpeedValue.value = settings.hueIncrement;
+            // Appearance UI
+            particleSizeMinSlider.value = settings.particleSizeMin;
+            particleSizeMinValue.value = settings.particleSizeMin;
+            particleSizeMaxSlider.value = settings.particleSizeMax;
+            particleSizeMaxValue.value = settings.particleSizeMax;
+            lifespanBaseSlider.value = settings.lifespanBase;
+            lifespanBaseValue.value = settings.lifespanBase;
+            lifespanVarianceSlider.value = settings.lifespanVariance;
+            lifespanVarianceValue.value = settings.lifespanVariance;
+            // Physics UI
+            gravityXSlider.value = settings.gravityX;
+            gravityXValue.value = settings.gravityX;
+            gravityYSlider.value = settings.gravityY;
+            gravityYValue.value = settings.gravityY;
+            frictionSlider.value = settings.friction;
+            frictionValue.value = settings.friction;
+            swirlStrengthSlider.value = settings.swirlFactor;
+            swirlStrengthValue.value = settings.swirlFactor;
+            mouseForceActiveCheckbox.checked = settings.mouseForceActive;
+            mouseForceStrengthSlider.value = settings.mouseForceStrength;
+            mouseForceStrengthValue.value = settings.mouseForceStrength;
+            boundaryModeSelect.value = settings.boundaryMode;
+        }
+
+        // Function to apply default settings
+        function applyDefaults() {
+            settings = { ...defaultSettings };
+            updateUIFromSettings();
+            showMessage("Settings reset to default", 1500);
+        }
+
+        // --- Particle Class ---
+        class Particle {
+            constructor(x, y, currentHue) {
+                this.x = x;
+                this.y = y;
+                // Use new size settings
+                this.size = Math.random() * (settings.particleSizeMax - settings.particleSizeMin) + settings.particleSizeMin;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * settings.baseSpeed + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.color = `hsl(${currentHue % 360}, 100%, 50%)`;
+                // Use new lifespan settings
+                this.lifespan = settings.lifespanBase + Math.random() * settings.lifespanVariance;
+                this.initialLifespan = this.lifespan;
+                this.history = [];
+                this.maxHistory = settings.trailHistory;
+            }
+
+            // Update particle position and properties
+            update(deltaTime) {
+                // Store previous position for trail
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                }
+
+                // Frame rate independence factor
+                const dtFactor = Math.min(deltaTime / 16.67, 3); // Allow slightly larger factor
+
+                // --- Physics Calculations ---
+                // Apply Gravity X & Y
+                this.vx += settings.gravityX * dtFactor;
+                this.vy += settings.gravityY * dtFactor;
+
+                // Apply Mouse Force (if active)
+                if (settings.mouseForceActive) {
+                    const dx = mouseX - this.x;
+                    const dy = mouseY - this.y;
+                    const distSq = dx * dx + dy * dy;
+                    const minForceDistSq = 50 * 50; // Don't apply force if too close/far to avoid extreme acceleration
+                    const maxForceDistSq = 1000 * 1000;
+
+                    if (distSq > minForceDistSq && distSq < maxForceDistSq) {
+                        const dist = Math.sqrt(distSq);
+                        const force = settings.mouseForceStrength / dist; // Force inversely proportional to distance
+                        const forceX = (dx / dist) * force;
+                        const forceY = (dy / dist) * force;
+                        this.vx += forceX * dtFactor;
+                        this.vy += forceY * dtFactor;
+                    }
+                }
+
+                // Apply Friction (damping)
+                const frictionFactor = Math.pow(1 - settings.friction, dtFactor);
+                this.vx *= frictionFactor;
+                this.vy *= frictionFactor;
+
+                // Apply Swirling motion
+                const angleOffset = Math.sin(hue * 0.01 + this.x * 0.01) * settings.swirlFactor;
+                const currentAngle = Math.atan2(this.vy, this.vx);
+                const newAngle = currentAngle + angleOffset;
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                this.vx = Math.cos(newAngle) * speed;
+                this.vy = Math.sin(newAngle) * speed;
+
+                // --- Update Position ---
+                this.x += this.vx * dtFactor;
+                this.y += this.vy * dtFactor;
+
+                // --- Handle Boundaries ---
+                this.handleBoundaries();
+
+                // --- Update Lifespan & Size ---
+                this.lifespan -= 1 * dtFactor;
+                if (this.size > 0.2) this.size -= 0.02 * dtFactor;
+            }
+
+            // Handle boundary interactions
+            handleBoundaries() {
+                const buffer = this.size; // Use particle size as buffer
+
+                if (settings.boundaryMode === 'wrap') {
+                    if (this.x < -buffer) this.x = canvas.width + buffer;
+                    if (this.x > canvas.width + buffer) this.x = -buffer;
+                    if (this.y < -buffer) this.y = canvas.height + buffer;
+                    if (this.y > canvas.height + buffer) this.y = -buffer;
+                } else if (settings.boundaryMode === 'bounce') {
+                    if (this.x < buffer) {
+                        this.x = buffer; // Nudge back inside
+                        this.vx *= -0.8; // Reverse velocity with slight damping
+                    } else if (this.x > canvas.width - buffer) {
+                        this.x = canvas.width - buffer;
+                        this.vx *= -0.8;
+                    }
+                    if (this.y < buffer) {
+                        this.y = buffer;
+                        this.vy *= -0.8;
+                    } else if (this.y > canvas.height - buffer) {
+                        this.y = canvas.height - buffer;
+                        this.vy *= -0.8;
+                    }
+                }
+                // 'disappear' mode handled by the lifespan/offscreen check in handleParticles
+            }
+
+
+            // Draw the particle and its trail
+            draw(currentHue) {
+                 // Ensure size is valid
+                 const currentSize = Math.max(0.1, this.size);
+
+                // Draw trail
+                if (this.history.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.history[0].x, this.history[0].y);
+                    for (let i = 1; i < this.history.length; i++) {
+                        ctx.lineTo(this.history[i].x, this.history[i].y);
+                    }
+                    const trailOpacity = Math.max(0, this.lifespan / this.initialLifespan * 0.5);
+                    ctx.strokeStyle = `hsla(${currentHue % 360}, 100%, 50%, ${trailOpacity})`;
+                    ctx.lineWidth = Math.max(0.1, currentSize * 0.5); // Trail width based on current size
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+
+                // Draw particle head
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, currentSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // --- Animation Functions ---
+
+        function handleParticles(deltaTime) {
+            // Create new particles
+            if (isMouseDown || particles.length < 50) { // Keep generating some if count is low
+                 const rate = isMouseDown ? settings.generationRate : Math.max(1, Math.floor(settings.generationRate / 5)); // Slower base rate
+                 for (let i = 0; i < rate; i++) {
+                    if (particles.length < settings.maxParticles) {
+                        particles.push(new Particle(particleSourceX, particleSourceY, hue));
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            // Update and draw existing particles
+            const disappearBuffer = 100; // How far offscreen before disappearing in that mode
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update(deltaTime);
+                particles[i].draw(hue);
+
+                // Remove dead particles OR particles off-screen in 'disappear' mode
+                let shouldRemove = particles[i].lifespan <= 0;
+                if (!shouldRemove && settings.boundaryMode === 'disappear') {
+                     shouldRemove = particles[i].x < -disappearBuffer || particles[i].x > canvas.width + disappearBuffer ||
+                                    particles[i].y < -disappearBuffer || particles[i].y > canvas.height + disappearBuffer;
+                }
+
+                if (shouldRemove) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Animation loop
+        function animate(currentTime) {
+             const deltaTime = currentTime - lastTime;
+             lastTime = currentTime;
+             const dtFactor = Math.min(deltaTime / 16.67, 3);
+
+            // Clear canvas
+            ctx.fillStyle = `rgba(0, 0, 0, ${settings.backgroundAlpha})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update particle source if mouse is not down (default to center)
+            // Mouse position is updated continuously via listener now
+            if (!isMouseDown) {
+                particleSourceX = canvas.width / 2;
+                particleSourceY = canvas.height / 2;
+            } else {
+                 particleSourceX = mouseX; // Emit from current mouse pos if down
+                 particleSourceY = mouseY;
+            }
+
+
+            // Handle particles
+            handleParticles(deltaTime || 16.67);
+
+            // Increment hue
+            hue += settings.hueIncrement * dtFactor;
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- Utility Functions ---
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Don't reset sourceX/Y here, let mouse position handle it
+        }
+
+        function showMessage(text, duration = 2000) {
+            messageBox.textContent = text;
+            messageBox.classList.add('visible');
+            setTimeout(() => {
+                messageBox.classList.remove('visible');
+            }, duration);
+        }
+
+        function toggleControls() {
+            const isHidden = controlsPanel.classList.toggle('hidden');
+            toggleControlsButton.classList.toggle('panel-visible', !isHidden);
+            toggleControlsButton.title = isHidden ? "Show Controls" : "Hide Controls";
+             toggleControlsButton.innerHTML = isHidden
+                 ? `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>`
+                 : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+        }
+
+        // --- Event Listeners ---
+
+        window.addEventListener('resize', resizeCanvas);
+        toggleControlsButton.addEventListener('click', toggleControls);
+
+        // Helper to link slider and number input
+        function setupLinkedInputs(sliderEl, numberEl, settingKey, isFloat = false, minEl = null, maxEl = null) {
+             const parseFn = isFloat ? parseFloat : parseInt;
+             const updateSetting = (valueStr) => {
+                 let value = parseFn(valueStr);
+                 const min = parseFn(sliderEl.min);
+                 const max = parseFn(sliderEl.max);
+                 if (isNaN(value)) return; // Ignore if not a number
+                 value = Math.max(min, Math.min(max, value)); // Clamp value
+
+                 // Ensure min <= max for range settings
+                 if (minEl && settingKey === maxEl.id) { // If updating max value
+                     const minValue = parseFn(minEl.value);
+                     if (value < minValue) value = minValue;
+                 } else if (maxEl && settingKey === minEl.id) { // If updating min value
+                     const maxValue = parseFn(maxEl.value);
+                     if (value > maxValue) value = maxValue;
+                 }
+
+                 settings[settingKey] = value;
+                 sliderEl.value = value;
+                 numberEl.value = value; // Update number input in case it was clamped/adjusted
+             };
+
+             sliderEl.addEventListener('input', (e) => updateSetting(e.target.value));
+             numberEl.addEventListener('input', (e) => updateSetting(e.target.value));
+        }
+
+
+        // General Controls Listeners
+        setupLinkedInputs(particleCountSlider, particleCountValue, 'maxParticles');
+        setupLinkedInputs(maxSpeedSlider, maxSpeedValue, 'baseSpeed', true);
+        setupLinkedInputs(trailLengthSlider, trailLengthValue, 'backgroundAlpha', true);
+        setupLinkedInputs(colorSpeedSlider, colorSpeedValue, 'hueIncrement', true);
+
+        // Appearance Controls Listeners
+        setupLinkedInputs(particleSizeMinSlider, particleSizeMinValue, 'particleSizeMin', true, particleSizeMinSlider, particleSizeMaxSlider);
+        setupLinkedInputs(particleSizeMaxSlider, particleSizeMaxValue, 'particleSizeMax', true, particleSizeMinSlider, particleSizeMaxSlider);
+        setupLinkedInputs(lifespanBaseSlider, lifespanBaseValue, 'lifespanBase', false, lifespanBaseSlider, lifespanVarianceSlider); // Min lifespan
+        setupLinkedInputs(lifespanVarianceSlider, lifespanVarianceValue, 'lifespanVariance'); // Variance, not directly linked min/max
+
+        // Physics Controls Listeners
+        setupLinkedInputs(gravityXSlider, gravityXValue, 'gravityX', true);
+        setupLinkedInputs(gravityYSlider, gravityYValue, 'gravityY', true);
+        setupLinkedInputs(frictionSlider, frictionValue, 'friction', true);
+        setupLinkedInputs(swirlStrengthSlider, swirlStrengthValue, 'swirlFactor', true);
+        setupLinkedInputs(mouseForceStrengthSlider, mouseForceStrengthValue, 'mouseForceStrength', true);
+
+        mouseForceActiveCheckbox.addEventListener('change', (e) => {
+            settings.mouseForceActive = e.target.checked;
+        });
+        boundaryModeSelect.addEventListener('change', (e) => {
+            settings.boundaryMode = e.target.value;
+        });
+
+
+        // Reset and Clear Buttons
+        resetButton.addEventListener('click', applyDefaults);
+        clearButton.addEventListener('click', () => {
+             particles = [];
+             showMessage("Particles cleared", 1500);
+        });
+
+        // Canvas Mouse Interactions
+        canvas.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+            // If mouse button is down, update the particle source continuously
+            if (isMouseDown) {
+                particleSourceX = mouseX;
+                particleSourceY = mouseY;
+            }
+        });
+
+        canvas.addEventListener('mousedown', (event) => {
+             if (event.button === 0) { // Left click only
+                isMouseDown = true;
+                mouseX = event.clientX; // Update mouse position immediately
+                mouseY = event.clientY;
+                particleSourceX = mouseX; // Start emitting from click point
+                particleSourceY = mouseY;
+             }
+        });
+
+        canvas.addEventListener('mouseup', (event) => {
+             if (event.button === 0) { // Left click only
+                isMouseDown = false;
+             }
+        });
+         canvas.addEventListener('mouseleave', () => {
+             // Update mouse position one last time in case it was used for attraction
+             // mouseX = event.clientX;
+             // mouseY = event.clientY;
+             isMouseDown = false; // Stop emitting if mouse leaves canvas
+         });
+
+         // Burst on click (separate from mousedown/drag)
+         canvas.addEventListener('click', (event) => {
+             if (event.button === 0) { // Left click only
+                const clickX = event.clientX;
+                const clickY = event.clientY;
+                for (let i = 0; i < settings.burstOnClick; i++) {
+                   if (particles.length < settings.maxParticles) {
+                       particles.push(new Particle(clickX, clickY, hue));
+                   } else break;
+                }
+             }
+         });
+
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+
+        // --- Initialization ---
+        updateUIFromSettings(); // Set initial UI values
+        resizeCanvas();
+        requestAnimationFrame(animate); // Start the animation loop
+
+    </script>
+</body>
+</html>
